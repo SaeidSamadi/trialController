@@ -1,0 +1,57 @@
+---
+######### What robot is being controlled
+#MainRobot: JVRC1
+#MainRobot: HRP4Comanoid
+MainRobot: HRP4ComanoidChoreonoid
+#MainRobot: Talos
+######### Enabled controllers
+Enabled: [CoM]
+#Enabled: [LIPMStabilizer]
+#Enabled: [Posture]
+#Enabled: [LIPMWalking]
+#Enabled: [TrialController]
+######### Controller timestep
+Timestep: 0.005
+UDP:
+  IgnoredJoints:
+    joints: [L_HAND_J0, R_HAND_J0, L_HAND_J1]
+    halfsitting: true
+VerboseLoader: false
+Log: true
+LogTemplate: mc-control
+
+#######
+# GUI #
+#######
+# GUIServer section
+GUIServer:
+  # If true, enable the GUI server, otherwise or if absent, disable this
+  # feature
+  Enable: true
+  # Publication timestep, actual rate is rounded up depending on the controller
+  # timestep, a value of 0 indicates that the GUI timestep should be equal to
+  # the controller timestep
+  Timestep: 0.05
+  # IPC (inter-process communication) section, if the section is absent
+  # this disables the protocol, if the section is empty it is configured
+  # to its default settings.
+  IPC: {}
+    # If the GUI server IPC protocol is enabled, this is used as a base
+    # to create the sockets, the actual sockets name will be formed by
+    # adding _sub.ipc and _rep.ipc to the provided path. The file will
+    # be created if required. This defaults to $SYSTEM_TMP/mc_rtc
+    # Socket: /tmp/mc_rtc
+  # TCP section, the same remarks apply as IPC
+  TCP:
+    # Binding host, * binds to all interfaces
+    Host: "*"
+    # Binding ports, the first is used for PUB socket and the second for
+    # the PULL socket
+    Ports: [4242, 4343]
+  # # WS (websocket) section, the same remarks apply as IPC
+  # WS:
+  #   # Binding host, * binds to all interfaces
+  #   Host: "*"
+  #   # Binding ports, the first is used for PUB socket and the second for
+  #   # the PULL socket
+  #   Ports: [8080, 8081]
