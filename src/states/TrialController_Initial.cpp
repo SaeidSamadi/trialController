@@ -14,7 +14,7 @@ void TrialController_Initial::start(mc_control::fsm::Controller & ctl_)
 bool TrialController_Initial::run(mc_control::fsm::Controller & ctl_)
 {
   auto & ctl = static_cast<TrialController &>(ctl_);
-  output("OK");
+  // output("OK");
   return true;
 }
 

@@ -16,10 +16,36 @@ StatesFiles:
 - "@MC_STATES_RUNTIME_INSTALL_PREFIX@/data"
 # If true, state factory will be more verbose
 VerboseStateFactory: false
+ObserverPipelines:
+  - name: FirstPipeline
+    observers:
+      - type: Encoder
+      # - type: Attitude
+      - type: KinematicInertial
+      - type: BodySensor
+        update: true
+        config:
+          # bodySensor: Accelerometer
+          bodySensor: FloatingBase
 # Additional robots to load
 robots:
-  ground:
+  floor:
     module: env/ground
+  wall:
+    module: env/ground
+    init_pos:
+      translation: [0.45, 0.0, 0.0]
+      rotation: [0.0, -1.57, 0.0]
+  tilted_board:
+    module: env/ground
+    init_pos:
+      translation: [7.25, 0.0, 8.0]
+      rotation: [0.0, -0.80, 0.0]
+  slope:
+    module: env/ground
+    init_pos:
+      translation: [0.0, 0.2, 0.0]
+      rotation: [0.523, 0.0, 0.0]
 # General constraints, always on
 constraints:
 - type: contact
@@ -32,17 +58,17 @@ collisions:
   useMinimal: true
 # Initial set of contacts
 contacts:
-- r1: hrp4 
-  r2: ground
+- r1: talos
+  r2: floor
   r1Surface: LeftFoot
   r2Surface: AllGround
-- r1: hrp4 
-  r2: ground
+- r1: talos
+  r2: floor
   r1Surface: RightFoot
   r2Surface: AllGround
 
 # Some options for a specific robot
-hrp4:
+talos:
   posture:
     stiffness: 1
     weight: 10
@@ -50,9 +76,109 @@ hrp4:
     stiffness: 2
     weight: 100
 # Implement some additional text states
-states: {}
+states:
+  Choose:
+    base: Parallel
+    states: []
+    configs:
+      TrialController_ChooseTransition:
+        category: []
+      Message:
+        gui: []
+        log: info
+        message: "Manual transition"
+        prefix": "Waiting for"
+  Choose::Initial:
+    base: Choose
+    states: [MultiModal::Stabilizer, Message, TrialController_ChooseTransition]
+    configs:
+      TrialController_ChooseTransition:
+        actions:
+          Start Scenario: StartScenario
+  MultiModal::Stabilizer:
+    base: StabilizerStandingState
+    StabilizerConfig:
+      contacts: [Left, Right]
+  UpSlope::FSM::RightHandToWhiteboard:
+    base: Parallel
+    states: [UpSlope::Stabilizer::Center, RightHand::FSM::RightHandToWhiteboard]
+  UpSlope::Stabilizer::Center:
+    base: UpSlope::Stabilizer::GoCenter
+    completion: {}
+  UpSlope::Stabilizer::GoCenter:
+    base: MultiModal::Stabilizer::Go
+    stiffness: 3
+    above: CenterAnkles
+    completion:
+      dcmEval: [0.02, 0.05, 0.2]
+    StabilizerConfig:
+      contacts: [Left, Right]
+      # Target flat floor with right foot, and current orientation of the left (slope)
+      Right:
+        overwriteRPY:
+          roll: 0
+          pitch: 0
+        height: 0
+  MultiModal::Stabilizer::Go:
+    base: MultiModal::Stabilizer
+    completion:
+      dcmEval: [0.005, 0.005, 0.05]
+  RightHand::FSM::RightHandToWhiteboard:
+    base: Meta
+    transitions:
+      - [RightHand::TrajectoryToWhiteboard, OK, RightHand::EstablishContactWithConstantVel, Auto]
+  RightHand::TrajectoryToWhiteboard:
+    base: MetaTasks
+    tasks:
+      RightHandTrajectory:
+        type: bspline_trajectory
+        setupMode: false
+        surface: RightHandBase
+        weight: 500.0
+        stiffness: 50.0
+        duration: 4.0
+        dimWeight: [1.0, 1.0, 1.0, 1.0, 0.5, 0.5]
+        displaySamples: 50
+        # XXX we'll want to handle early-impact
+        completion:
+          timeElapsed: true
+        # XXX would be better to target a surface on the environment
+        target:
+          translation: [0.3, -0.35, 0.95]
+          rotation: [-0.908, 0.0, 1.57]
+        controlPoints:
+          - [0.0, -0.5, 0.85]
+        oriWaypoints:
+          - [3.5, [-0.785, 0.0, 1.57]]
+    RemoveCollisionsAfter:
+      - r1: talos
+        r2: tilted_board
+  RightHand::EstablishContactWithConstantVel:
+    base: MetaTasks
+    AddContactsAfter:
+      - r1: talos
+        r2: tilted_board
+        r1Surface: RightHandBase
+        r2Surface: AllGround
+        dof: [1, 1, 1, 1, 1, 1]
+    tasks:
+      RightHandContactConstantVelocity:
+        type: surfaceTransform
+        surface: RightHandBase
+        refVel: [0,0,0,0,0,-0.05]
+        stiffness: 1
+        damping: 300
+        weight: 800
+        completion:
+          wrench:
+            couple: [0, 0, 0]
+            force: [0, 0, 25]
+
+
 # Transitions map
 transitions:
-- [TrialController_Initial, OK, TrialController_Initial, Strict]
+- [Choose::Initial, StartScenario, UpSlope::FSM::RightHandToWhiteboard, Auto]
+# - [TrialController_Initial, OK, TrialController_Initial, Strict]
 # Initial state
-init: TrialController_Initial
+init: Choose::Initial
+# init: TrialController_Initial
